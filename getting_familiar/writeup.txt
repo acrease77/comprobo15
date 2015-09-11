@@ -1,0 +1,29 @@
+#!/usr/bin/env python
+
+Worked with Rocco DiVerdi
+
+RosBag Questions
+
+1. How might rosbag fit into a debuggin process as you work on projects in this class?
+
+Rosbag is a great debugging tool because it allows you to save and replay what the robot is sensing. If you saw something strange happen to the robot's sensors at a certain point during a test, then you can replay the rosbag data to figure out what happened. We can use rosbag to playback how the robot is moving, sensing, and mapping its environment, so it can be used for debugging problems with the robot's 
+
+2. Are there any obvious shortcomings of rosbag as a debugging tool?
+
+While rosbag can replay what the robot has sensed in the environment, it cannot play back what actually happened in real life. This makes it more difficult to figure out what went wrong in certain cases, especially with the camera off. Also, it takes a long time to send large files, like images, across the wifi, so not everything can be recorded.
+
+Coordinate Systems and the TF Module Questions
+
+Does the new behavior (changing from odom) make sense?
+
+Yes, because the reference frame is centering the grid on the robot instead of the world, and the "odom" reference frame movement we are seeing is the "position" of the wheels. Tf shows the transform between the base_link reference frame and the odom reference frame, and in general we are seeing the "robot centric" view of the environment.
+
+ROS Callbacks and Threading Questions
+
+What happens when you run this code?  What assumption can you safely make about any code that you put in a sensor callback?  In what ways might the behavior you observe be suboptimal when programming a robot? 
+
+The talker is constantly sending signals, and the listener checks for messages every 10 seconds, and publishes the most recent one. We can assume that the code in a sensor callback will only ever run on the most recent messages sent, so that you don't have any delayed responses. The drawback of this system is that if there is an important message only published once, the listener may miss it and never respond effectively. 
+
+What happens now?  In what scenarios is this behavior good?  In what scenarios is this behavior bad?
+
+The listener know has memory; it keeps a backlog of unread messages, meaning it publishes all the messages, but is not publishing them "real-time". This is advantageous if time is not an issue in the situation, but information is. This is bad because the listener does not keep up with the talker.
