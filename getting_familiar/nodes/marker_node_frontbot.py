@@ -9,11 +9,13 @@ import rospy
 
 rospy.init_node('marker_node_front_bot')
 
-def update_message():
-	point_msg = Point(x=2.0, y=0.0, z=0.0)
+def update_message():		#adds marker
+	point_msg = Point(x=2.0, y=0.0, z=0.0)	#adds marker 2 meters in front of robot
 	pose_msg = Pose(position=point_msg)
-	scale_msg = Vector3(x=.5, y=0.5, z=0.5)
-	color_msg = ColorRGBA(r=1.0, g = 1.0, b=1.0, a=.5)
+	scale_msg = Vector3(x=.5, y=0.5, z=0.5)		#marker size
+	color_msg = ColorRGBA(r=1.0, g = 1.0, b=1.0, a=.5)		#marker color
+
+	#adds marker in front of robot
 
 	header_msg = Header(stamp=rospy.Time.now(),
 					    frame_id="base_link")
@@ -26,6 +28,6 @@ pub = rospy.Publisher("/my_point", Marker, queue_size=10)
 
 r = rospy.Rate(10)
 while not rospy.is_shutdown():
-	msg = update_message()
+	msg = update_message()		#updates marker continuously to follow the robot
 	pub.publish(msg)
 	r.sleep()

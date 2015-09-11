@@ -55,6 +55,8 @@ def rotate():
 			return 'done'
 		r.sleep()
 
+#drives in a line, then turns 4 times
+
 def square():
 	time.sleep(3)
 	for i in range(4):
@@ -67,43 +69,53 @@ def square():
 		pub.publish(stop())
 	print 'mission complete'
 
+#Move forward commands
+
 forward_lin=Vector3(x=0.5,y=0.0,z=0.0)
 forward_ang=Vector3(x=0.0,y=0.0,z=0.0)
 forward_msg=Twist(linear=forward_lin, angular=forward_ang)
+
+#Move backward commands
 
 backward_lin=Vector3(x=-0.5,y=0.0,z=0.0)
 backward_ang=Vector3(x=0.0,y=0.0,z=0.0)
 backward_msg=Twist(linear=backward_lin, angular=backward_ang)
 
+#turn left commands
+
 turn_left_lin=Vector3(x=0.0,y=0.0,z=0.0)
 turn_left_ang=Vector3(x=0.0,y=0.0,z=1.0)
 turn_left_msg=Twist(linear=turn_left_lin, angular=turn_left_ang)
+
+#turn right commands
 
 turn_right_lin=Vector3(x=0.0,y=0.0,z=0.0)
 turn_right_ang=Vector3(x=0.0,y=0.0,z=-1.0)
 turn_right_msg=Twist(linear=turn_right_lin, angular=turn_right_ang)
 
+#stop commands
+
 stop_lin=Vector3(x=0.0,y=0.0,z=0.0)
 stop_ang=Vector3(x=0.0,y=0.0,z=0.0)
 stop_msg=Twist(linear=stop_lin, angular=stop_ang)
 
-def forward():
+def forward():	#move forward
 	print 'forward'
 	return forward_msg
 
-def backward():
+def backward():	#move backward
 	print 'backward'
 	return backward_msg
 
-def turn_left():
+def turn_left():	#turn left
 	print 'turn left'
 	return turn_left_msg
 
-def turn_right():
+def turn_right():	#turn right
 	print 'turn right'
 	return turn_right_msg
 
-def stop():
+def stop():		#stop
 	print 'STHAAAPPPPP'
 	return stop_msg
 

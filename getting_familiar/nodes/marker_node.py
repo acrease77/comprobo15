@@ -9,10 +9,12 @@ import rospy
 
 rospy.init_node('marker_node')
 
+#places sphere at (1,2)
+
 point_msg = Point(x=1.0, y=2.0, z=0.0)
 pose_msg = Pose(position=point_msg)
-scale_msg = Vector3(x=1.0, y=1.0, z=1.0)
-color_msg = ColorRGBA(r=1.0, g = 1.0, b=1.0, a=.5)
+scale_msg = Vector3(x=1.0, y=1.0, z=1.0)	#sphere size
+color_msg = ColorRGBA(r=1.0, g = 1.0, b=1.0, a=.5)	#sphere color
 
 header_msg = Header(stamp=rospy.Time.now(),
 				    frame_id="odom")
@@ -25,5 +27,3 @@ r = rospy.Rate(10)
 while not rospy.is_shutdown():
 	pub.publish(msg)
 	r.sleep()
-
-print 'hello'
