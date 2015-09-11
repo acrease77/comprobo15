@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-"""publishes message to put marker at (1,2) in rvis odom"""
+"""publishes message to put marker 2 meters in front of the robot in rvis odom"""
 
 from visualization_msgs.msg import Marker
 from geometry_msgs.msg import Pose, Point, Vector3
 from std_msgs.msg import Header, ColorRGBA
 import rospy
 
-rospy.init_node('marker_node')
+rospy.init_node('marker_node_front_bot')
 
 def update_message():
 	point_msg = Point(x=2.0, y=0.0, z=0.0)
