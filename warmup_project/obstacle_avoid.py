@@ -44,10 +44,15 @@ class Robot_Control():
     def obstacle_avoid(self):
         things = self.find_things()
         vector = self.obstacle_arbiter(things)
-        k= -5
+        #if vector[0] >= 0 and vector[1] >= 0:
         c= 1.5
+        k= 0.01
         forward = c*vector[0]
-        spin = k*vector[1]
+        if vector[1] == 0:
+            spin = 0.0
+        else:
+            spin = k/vector[1]
+        print spin
         self.set_motion(forward=forward,spin=spin)
 
     def find_wall(self):
@@ -74,7 +79,7 @@ class Robot_Control():
         variable_name = list(enumerate(readings))
         body_reading = []
         for reading in variable_name:
-            if reading[1] > .5 and reading[1] < 1.5:
+            if reading[1] > .25 and reading[1] < 2:
                 body_reading.append(reading)
         angle_sum=0.0
         dist_sum=0.0
@@ -166,7 +171,7 @@ class Robot_Control():
             self.data=data.ranges
 
     def main_loop(self):
-            print self.state
+            #print self.state
             if self.state == 'find_wall':
                 if self.data != ():
                     self.find_wall()
