@@ -1,0 +1,7 @@
+#!/usr/bin/env python
+
+rostopic list -- all the topics subscribed to
+
+rostopic info -- info on topic that you are subscribed to
+
+rosmsg show -- show attributes to a certain topic 
