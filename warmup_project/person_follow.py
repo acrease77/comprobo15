@@ -100,13 +100,13 @@ class Robot_Control():
 
     def laser_callback(self, data):
         '''reads data from the laser'''
-            self.data=data.ranges   #sets the data to self.data
+        self.data=data.ranges   #sets the data to self.data
 
     def main_loop(self):
         '''runs the entire follow person sequence of the robot'''
             #print self.state
-            if self.state == 'follow_person':   #if the state of the robot is follow_person, then run the follow_person functions
-                self.follow_person()
+        if self.state == 'follow_person':   #if the state of the robot is follow_person then run the follow_person functions
+            self.follow_person()
 
 if __name__=='__main__':
     neato = Robot_Control()     #defines neato as robot_control class
