@@ -32,6 +32,15 @@ class Robot_Control():
         vector = [forward_vector,side_vector]
         return vector
 
+    def polar_convert(self,vector):
+        if vector[0] == 0:
+            angle = 90
+        else:
+            rad = math.atan(vector[1]/vector[0])
+            angle = math.degrees(rad)
+        r = math.sqrt(vector[0]*vector[0] + vector[1]*vector[1])
+        return [r, angle]
+
     def obstacle_arbiter(self,readings):
         sum_vectors = [0.0,0.0]
         for vector in readings:
@@ -44,14 +53,15 @@ class Robot_Control():
     def obstacle_avoid(self):
         things = self.find_things()
         vector = self.obstacle_arbiter(things)
+        polar_vector = polar_convert(vector)
         #if vector[0] >= 0 and vector[1] >= 0:
         c= 1.5
         k= 0.01
         forward = c*vector[0]
-        if vector[1] == 0:
+        if polar_vector[1] == 0:
             spin = 0.0
         else:
-            spin = k/vector[1]
+            spin = k/(polar_vector[1]*polar_vector[0])
         print spin
         self.set_motion(forward=forward,spin=spin)
 

@@ -25,6 +25,7 @@ class Robot_Control():
 
 
     def find_wall(self):
+    '''sweeps through angles and finds the closest distance to wall, setting it as the distance to stay from the wall and the "goal angle" to stay perpendicular to the wall'''
         dists = []
         for i in range(8):
             dists.append(self.read_angle(45*i+22))
@@ -38,6 +39,7 @@ class Robot_Control():
 
 
     def wall_follow(self):
+    '''gets the distance away from the wall on either side of the goal angle, and follows the wall by attempting to keep it constant'''
         k= -1.27
         c=.03
         dist1 = self.read_angle(self.goal+40)
