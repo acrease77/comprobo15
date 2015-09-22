@@ -1,0 +1,38 @@
+
+Writeup for Warmup Project due 9/21/2015
+
+Worked with Rocco Diverdi
+
+1. Which behaviors did you implement?
+
+We implemented the wall following, person following, and obstacle avoidance behaviors, as well as a finite-state-control behavior that switched between all of the states based on certain conditions the Neato was exposed to.
+
+2. For each behavior, what strategy did you use to implement the behavior? 
+
+Wall follow would first find the wall by sweeping in 45 degree increments with the lidar to find the closest point to a near wall. This ensures that the Neato can start with the wall on either side. Once it has located the wall, it reads the distance to the wall at plus and minus 45 degrees from the left or right side, depending on the side the wall is on. We then calculated the difference between the two distances and used proportional control to try and keep that distance constant. The robot moves forward at a rate proportional to the inverse of the error, so it will move forward slower when the error is larger and faster when the error is small. The turning speed is proportional to the error, so it turns faster with a larger error and vise-versa. To deal with corners, if the Neato bumps into a wall, it will register a corner hit, turn away from the corner, and then continue to wall follow.
+
+Person follow used center of mass calculations based on readings at a specific range in front of the robot to find and follow a person. The robot recorded the angle and distance of all points between .25 and 1.5 meters within 35 degrees of the forward direction of the robot. All these values and angles were summed to obtain the centered value. Similar to the proportional control from wall follow, the robot would attempt to keep .5 meters away from the person by increasing its velocity when there was a larger error and decreasing velocity with a smaller error. The robot would always try to turn to center the COM angle reading on its lidar as well. If it didn't read anything, it would stop.
+
+Our obstacle avoidance was a hybrid of the "force addition" method described in the prompt and the simpler method that turns if the Neato reads that something is in front of it. We split the robot's vision into four quadrants. Any readings in the front two quadrants of the robot would make the robot turn away from those quadrants, and any readings in the back two quadrants would make the robot turn a little bit back toward those quadrants. This makes the Neato stay on a relatively straight path while avoiding obstacles. The speed of the turn was proportional to the inverse of the distance of the readings to the Neato, so a smaller, closer reading would make the Neato turn faster.
+
+3. For the finite state controller, what were the states?  What did the robot do in each state?  How did you combine and how did you detect when to transition between behaviors?
+
+Our state controller switched between all the states we had created. The robot starts in obstacle avoidance mode until it bumps into something, and it then switches to person following. If the person leaves the range of the Neato (or it doesn't see a person to begin with), it transistions into the wall following behavior. If the robot doesn't see a wall anymore, or sees objects on the other side of the Neato from the wall, it goes back into obstacle avoidance.
+
+4. How did you structure your code?
+
+From the beginning, we had structured our code into classes with multiple states for the smaller tasks of each problem (finding a wall, following a wall, bumping into a wall, etc). This was a great idea because it was very easy to set up the finite state control without too much extra work. In our main loops, different overarching functions that defined the behavior of the robot would run depending on its state, and the state would change based on certain readings.
+
+5. What if any challenges did you face along the way?
+
+Our biggest challenge was figuring out a good way to structure the obstacle avoidance code. We had first started out by summing the "forces" coming from each object based on their distance from the robot, but our code became messy and confusing very fast because of the force summations and angle conversions, and it was difficult for the robot to recognize when something was directly in front of it versus two things on either side of the robot. By using a hybrid approach and handling the case with objects in certain ranges, we were able to eliminate this problem and have it mesh well with other states.
+
+6. What would you do to improve your project if you had more time?
+
+I'd be interested in somehow being able to characterize certain objects better. Our finite state control sort of did this, but, for example, the Neato could mistake a chair for a person or a wall, or a wall for just another obstacle, etc. It'd be interesting to figure out how to recognize objects based on the lidar data recieved; things like walls would probably be pretty easy to identify, and you could use some form of SLAM to recognize a table leg pattern. Identifying legs would be pretty hard though.
+
+7. Did you learn any interesting lessons for future robotic programming projects?
+
+Finite state control is so nice!! Also, I realized in this project that you don't need to recognize an object to perform a certain behavior on it; the behaviro will just work the best on that object and work somewhat on others. FOr example, wall following and person following programs don't require identification of a wall or person, which simplifies the problems a lot.
+
+
