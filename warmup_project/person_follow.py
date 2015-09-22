@@ -10,6 +10,9 @@ from sensor_msgs.msg import LaserScan
 class Robot_Control():
     '''This class allows the robot to find and follow a person within 1.5 meters of the front of the robot'''
     def __init__(self):
+        '''
+            initialize ros node and variables which are accessed by multiple functions
+        '''
         rospy.init_node('estop', anonymous=True)
         #rospy.Subscriber('/bump', Bump, self.bump_callback)
         rospy.Subscriber('/scan', LaserScan, self.laser_callback)
