@@ -20,7 +20,7 @@ import math
 import time
 
 import numpy as np
-from numpy.random import random_sample
+from numpy.random import random_sample, randn
 from sklearn.neighbors import NearestNeighbors
 from occupancy_field import OccupancyField
 
@@ -117,7 +117,7 @@ class ParticleFilter:
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
         # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
         #       into the init method for OccupancyField
-        map = 
+        map = '~/mymap.yaml'
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
         #self.occupancy_field = OccupancyField(map)
         self.initialized = True
@@ -157,6 +157,11 @@ class ParticleFilter:
             return
 
         # TODO: modify particles using delta
+        for particle in self.particle_cloud:
+            particle.x = particle.x + delta[0]*math.cos(particle.theta) - delta[1]*math.sin(particle.theta)
+            particle.y = particle.y + delta[1]*math.sin(particle.theta) + delta[0]*math.cos(particle.theta)
+            particle.theta += delta[2]
+
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
 
     def map_calc_range(self,x,y,theta):
@@ -221,6 +226,14 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         # TODO create particles
+        for i in range(200):
+            stdx = .5
+            stdy = .5
+            stdt = math.pi/4
+            x = stdx*randn() + xy_theta[0]
+            y = stdy*randn() + xy_theta[1]
+            theta = stdt*randn() + xy_theta[2]
+            self.particle_cloud.append(Particle(x,y,theta))
 
         self.normalize_particles()
         self.update_robot_pose()
