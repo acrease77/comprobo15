@@ -1,0 +1,6 @@
+1. Go straight until there can be no more info gained from going straight or you almost run into a wall.
+2. Don't turn when you can't see a wall well
+3. only turn or only go forward
+4. If the robot runs significantly off the map, start over.
+
+Changed angle threshold to pi/8 instead of pi/6

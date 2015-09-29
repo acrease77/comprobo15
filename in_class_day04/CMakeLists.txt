@@ -6,7 +6,7 @@ project(in_class_day04)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
-  navigation_msgs
+  nav_msgs
   rospy
   sensor_msgs
   std_msgs

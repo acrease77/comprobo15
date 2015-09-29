@@ -90,7 +90,7 @@ class ParticleFilter:
         self.n_particles = 300          # the number of particles to use
 
         self.d_thresh = 0.2             # the amount of linear movement before performing an update
-        self.a_thresh = math.pi/6       # the amount of angular movement before performing an update
+        self.a_thresh = math.pi/8       # the amount of angular movement before performing an update
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
 
@@ -117,7 +117,7 @@ class ParticleFilter:
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
         # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
         #       into the init method for OccupancyField
-
+        map = 
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
         #self.occupancy_field = OccupancyField(map)
         self.initialized = True
