@@ -157,10 +157,13 @@ class ParticleFilter:
             return
 
         # TODO: modify particles using delta
+        xscale = .1             #randomness scaling for X
+        yscale = .1             #randomness scaling for Y
+        tscale =  math.pi/30    #randomness scaling for rotation
         for particle in self.particle_cloud:
-            particle.x = particle.x + delta[0]*math.cos(particle.theta) - delta[1]*math.sin(particle.theta)
-            particle.y = particle.y + delta[1]*math.sin(particle.theta) + delta[0]*math.cos(particle.theta)
-            particle.theta += delta[2]
+            particle.x = particle.x + delta[0]*math.cos(self.current_odom_xy_theta[2]+particle.theta) - delta[1]*math.sin(self.current_odom_xy_theta[2]+particle.theta) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
+            particle.y = particle.y + delta[1]*math.cos(self.current_odom_xy_theta[2]+particle.theta) + delta[0]*math.sin(self.current_odom_xy_theta[2]+particle.theta) + yscale*randn()  #updates the Y position based on the bot movement, and adds a random factor to the system
+            particle.theta += delta[2] + tscale*randn()     #updates the particle rotation based on the bot movement, and adds a random factor to the system
 
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
 
@@ -218,7 +221,7 @@ class ParticleFilter:
         self.fix_map_to_odom_transform(msg)
 
     def initialize_particle_cloud(self, xy_theta=None):
-        """ Initialize the particle cloud.
+        """ Initialize the particle cloud as a gaussian distribution around the guess
             Arguments
             xy_theta: a triple consisting of the mean x, y, and theta (yaw) to initialize the
                       particle cloud around.  If this input is ommitted, the odometry will be used """
@@ -226,14 +229,14 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         # TODO create particles
-        for i in range(200):
-            stdx = .5
-            stdy = .5
-            stdt = math.pi/4
-            x = stdx*randn() + xy_theta[0]
-            y = stdy*randn() + xy_theta[1]
-            theta = stdt*randn() + xy_theta[2]
-            self.particle_cloud.append(Particle(x,y,theta))
+        for i in range(200):    #creates 2000 points distributed with a gaussian distribution
+            stdx = .5           #standard deviation scale of x direction
+            stdy = .5           #standard deviation scale of y direction
+            stdt = math.pi/4    #standard deviation scale of theta
+            x = stdx*randn() + xy_theta[0]      #creates random x coordinate centered around guess with a gaussian distribution
+            y = stdy*randn() + xy_theta[1]      #creates random y coordinate centered around guess with a gaussian distribution
+            theta = stdt*randn() + xy_theta[2]  #creates random theta centered around guess with a gaussian distribution
+            self.particle_cloud.append(Particle(x,y,theta)) #appends random particle
 
         self.normalize_particles()
         self.update_robot_pose()
