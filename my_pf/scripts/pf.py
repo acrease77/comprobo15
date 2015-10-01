@@ -117,10 +117,26 @@ class ParticleFilter:
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
         # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
         #       into the init method for OccupancyField
-        map = '~/mymap.yaml'
+
+        map = self.map_reader() #loads the map using the static_map service
+        
         # for now we have commented out the occupancy field initialization until you can successfully fetch the map
-        #self.occupancy_field = OccupancyField(map)
+        self.occupancy_field = OccupancyField(map)
         self.initialized = True
+
+    def map_reader(self):
+        """ Loads the map using the static_map service so that we can read from the map
+        """
+        print 'im waiting'
+        rospy.wait_for_service('static_map')    #waits for the map to be available
+        try:
+            mapcall = rospy.ServiceProxy('static_map', GetMap)   #tries to retrieve the map once it is available
+            map = mapcall().map                                  #just obtains the map section of the occupancy grid
+            print '\n\n\nim happy\n\n\n'
+            return map                                          #returns the map
+        except rospy.ServiceException, e:                       #if the map can't be obtained, prints the error message
+            print "Service call failed: %s"%e
+
 
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles.
@@ -161,8 +177,8 @@ class ParticleFilter:
         yscale = .1             #randomness scaling for Y
         tscale =  math.pi/30    #randomness scaling for rotation
         for particle in self.particle_cloud:
-            particle.x = particle.x + delta[0]*math.cos(self.current_odom_xy_theta[2]+particle.theta) - delta[1]*math.sin(self.current_odom_xy_theta[2]+particle.theta) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
-            particle.y = particle.y + delta[1]*math.cos(self.current_odom_xy_theta[2]+particle.theta) + delta[0]*math.sin(self.current_odom_xy_theta[2]+particle.theta) + yscale*randn()  #updates the Y position based on the bot movement, and adds a random factor to the system
+            particle.x = particle.x + delta[0]*math.cos(particle.theta-self.current_odom_xy_theta[2]) - delta[1]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
+            particle.y = particle.y + delta[1]*math.cos(particle.theta-self.current_odom_xy_theta[2]) + delta[0]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + yscale*randn()  #updates the Y position based on the bot movement, and adds a random factor to the system
             particle.theta += delta[2] + tscale*randn()     #updates the particle rotation based on the bot movement, and adds a random factor to the system
 
         # For added difficulty: Implement sample_motion_odometry (Prob Rob p 136)
@@ -184,8 +200,13 @@ class ParticleFilter:
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
-        # TODO: implement this
         pass
+        #for particle in particle_cloud:
+
+        #d = LaserScan.ranges
+        #sigma = 
+        #var = sigma**2
+        #math.exp(d**2 / 2*var )
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -243,8 +264,12 @@ class ParticleFilter:
 
     def normalize_particles(self):
         """ Make sure the particle weights define a valid distribution (i.e. sum to 1.0) """
-        pass
-        # TODO: implement this
+        totalweight = 0.0                       #initializes sum of all particle weights
+        for particle in self.particle_cloud:    # loops through particles
+            totalweight += particle.w           # sums all particle weights
+        for particle in self.particle_cloud:    # loops through particles
+            particle.w /= totalweight           # normalizes all particle weights
+            
 
     def publish_particles(self, msg):
         particles_conv = []
