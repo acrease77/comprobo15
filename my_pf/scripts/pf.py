@@ -93,6 +93,7 @@ class ParticleFilter:
         self.a_thresh = math.pi/8       # the amount of angular movement before performing an update
 
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
+        self.robot_pose = Pose()
 
         # TODO: define additional constants if needed
 
@@ -112,7 +113,7 @@ class ParticleFilter:
 
         self.particle_cloud = []
 
-        self.current_odom_xy_theta = []
+        self.current_odom_xy_theta = [0.0,0.0,0.0]
 
         # request the map from the map server, the map should be of type nav_msgs/OccupancyGrid
         # TODO: fill in the appropriate service call here.  The resultant map should be assigned be passed
@@ -139,17 +140,22 @@ class ParticleFilter:
 
 
     def update_robot_pose(self):
-        """ Update the estimate of the robot's pose given the updated particles.
-            There are two logical methods for this:
-                (1): compute the mean pose
-                (2): compute the most likely pose (i.e. the mode of the distribution)
+        """ Update the estimate of the robot's pose given the updated particles via a weighted average
+
         """
         # first make sure that the particle weights are normalized
-        self.normalize_particles()
+        self.normalize_particles()                          #normalizes particle weights
+        X = [point.x for point in self.particle_cloud]      # loops through x values and generates a list of all x values
+        Y = [point.y for point in self.particle_cloud]      # loops through y values and generates a list of all y values
+        Theta = [point.theta for point in self.particle_cloud]  # loops through theta values and generates a list of all theta values
+        Weight = [point.w for point in self.particle_cloud]     # loops through weights and generates a list of all weights
+        robox = np.ma.average(X,weights=[Weight])                # takes a weighted average of all X values
+        roboy = np.ma.average(Y,weights=[Weight])                # takes a weighted average of all Y values
+        robot = np.ma.average(Theta,weights=[Weight])            # takes a weighted average of all theta values
 
-        # TODO: assign the lastest pose into self.robot_pose as a geometry_msgs.Pose object
-        # just to get started we will fix the robot's pose to always be at the origin
-        self.robot_pose = Pose()
+        self.robot_pose.position.x = robox     #updates robot pose with weighted X averages
+        self.robot_pose.position.y = roboy     #updates robot pose with weighted Y averages
+        self.robot_pose.orientation.z = robot     #updates robot pose with weighted theta averages
 
     def update_particles_with_odom(self, msg):
         """ Update the particles using the newly given odometry pose.
@@ -172,10 +178,9 @@ class ParticleFilter:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        # TODO: modify particles using delta
-        xscale = .1             #randomness scaling for X
-        yscale = .1             #randomness scaling for Y
-        tscale =  math.pi/30    #randomness scaling for rotation
+        xscale = .01             #randomness scaling for X
+        yscale = .01             #randomness scaling for Y
+        tscale =  math.pi/20    #randomness scaling for rotation
         for particle in self.particle_cloud:
             particle.x = particle.x + delta[0]*math.cos(particle.theta-self.current_odom_xy_theta[2]) - delta[1]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
             particle.y = particle.y + delta[1]*math.cos(particle.theta-self.current_odom_xy_theta[2]) + delta[0]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + yscale*randn()  #updates the Y position based on the bot movement, and adds a random factor to the system
@@ -191,22 +196,38 @@ class ParticleFilter:
     def resample_particles(self):
         """ Resample the particles according to the new particle weights.
             The weights stored with each particle should define the probability that a particular
-            particle is selected in the resampling step.  You may want to make use of the given helper
-            function draw_random_sample.
+            particle is selected in the resampling step. 
         """
-        # make sure the distribution is normalized
-        self.normalize_particles()
-        # TODO: fill out the rest of the implementation
+        highest_portion = 8     #fraction of weighted particle cloud we will take
+        self.normalize_particles()  # make sure the distribution is normalized
+        Weight = [point.w for point in self.particle_cloud]     # loops through weights and generates a list of all weights
+        if len(self.particle_cloud) > 0:
+            likely_particles = self.draw_random_sample(self.particle_cloud, Weight, len(self.particle_cloud)/highest_portion)    #takes a random weighted sample from previous hypotheses that is a fraction of the original number of particles
+            self.particle_cloud = []                #clear particle cloud
+            stdx = .025           #standard deviation scale of x direction
+            stdy = .025           #standard deviation scale of y direction
+            stdt = math.pi/30    #standard deviation scale of theta
+            for particle in likely_particles:           #sweeps through the likely particles
+                self.particle_cloud.append(particle)    #appends original likely particles
+                for i in range(highest_portion - 1):                      #for each likely particle, appends as many particles as there were originally in particle_cloud
+                    x = stdx*randn() + particle.x      #creates random x coordinate centered around the first particle with a gaussian
+                    y = stdy*randn() + particle.y    #creates random y coordinate centered around the first particle with a gaussian
+                    theta = stdt*randn() + particle.theta  #creates random theta centered around the first particle with a gaussian
+                    self.particle_cloud.append(Particle(x,y,theta)) #appends the new particles close to the first
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
-        pass
-        #for particle in particle_cloud:
-
-        #d = LaserScan.ranges
-        #sigma = 
-        #var = sigma**2
-        #math.exp(d**2 / 2*var )
+        d = msg.ranges    #gathers lidar readings
+        robotmin = 100           #initialize minimum distance to a large value
+        sigma = .03                   # standard deviation of laser measurements
+        var = sigma**2                 # variance of laser measurements
+        for point in d:                     #sweeps through laser readings
+            if point > 0 and point < robotmin:   #picks out most recent smallest point that is nonzero
+                robotmin = point                 #updates minimum distance from objects to new reading
+        for particle in self.particle_cloud:         #sweeps through particle hypotheses
+            particlemin = self.occupancy_field.get_closest_obstacle_distance(particle.x,particle.y)     #determines minimum distance from particle hypotheses
+            diff = particlemin - robotmin       #computes difference between particle theory minimum and robot minimum
+            particle.w = math.exp(-diff**2/2*var)   #computes gaussian distribution to weight particles based on the difference
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -250,10 +271,10 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         # TODO create particles
-        for i in range(200):    #creates 2000 points distributed with a gaussian distribution
+        for i in range(500):    #creates 200 points distributed with a gaussian distribution
             stdx = .5           #standard deviation scale of x direction
             stdy = .5           #standard deviation scale of y direction
-            stdt = math.pi/4    #standard deviation scale of theta
+            stdt = math.pi/10    #standard deviation scale of theta
             x = stdx*randn() + xy_theta[0]      #creates random x coordinate centered around guess with a gaussian distribution
             y = stdy*randn() + xy_theta[1]      #creates random y coordinate centered around guess with a gaussian distribution
             theta = stdt*randn() + xy_theta[2]  #creates random theta centered around guess with a gaussian distribution
