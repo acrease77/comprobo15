@@ -125,6 +125,8 @@ class ParticleFilter:
         self.occupancy_field = OccupancyField(map)
         self.initialized = True
 
+        self.data = []  #initialize lidar readings
+
     def map_reader(self):
         """ Loads the map using the static_map service so that we can read from the map
         """
@@ -178,9 +180,9 @@ class ParticleFilter:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        xscale = .01             #randomness scaling for X
-        yscale = .01             #randomness scaling for Y
-        tscale =  math.pi/20    #randomness scaling for rotation
+        xscale = .25             #randomness scaling for X
+        yscale = .25             #randomness scaling for Y
+        tscale =  math.pi/4    #randomness scaling for rotation
         for particle in self.particle_cloud:
             particle.x = particle.x + delta[0]*math.cos(particle.theta-self.current_odom_xy_theta[2]) - delta[1]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
             particle.y = particle.y + delta[1]*math.cos(particle.theta-self.current_odom_xy_theta[2]) + delta[0]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + yscale*randn()  #updates the Y position based on the bot movement, and adds a random factor to the system
@@ -198,15 +200,15 @@ class ParticleFilter:
             The weights stored with each particle should define the probability that a particular
             particle is selected in the resampling step. 
         """
-        highest_portion = 8     #fraction of weighted particle cloud we will take
+        highest_portion = 2     #fraction of weighted particle cloud we will take
         self.normalize_particles()  # make sure the distribution is normalized
         Weight = [point.w for point in self.particle_cloud]     # loops through weights and generates a list of all weights
         if len(self.particle_cloud) > 0:
             likely_particles = self.draw_random_sample(self.particle_cloud, Weight, len(self.particle_cloud)/highest_portion)    #takes a random weighted sample from previous hypotheses that is a fraction of the original number of particles
             self.particle_cloud = []                #clear particle cloud
-            stdx = .025           #standard deviation scale of x direction
-            stdy = .025           #standard deviation scale of y direction
-            stdt = math.pi/30    #standard deviation scale of theta
+            stdx = .1           #standard deviation scale of x direction
+            stdy = .1           #standard deviation scale of y direction
+            stdt = math.pi/10    #standard deviation scale of theta
             for particle in likely_particles:           #sweeps through the likely particles
                 self.particle_cloud.append(particle)    #appends original likely particles
                 for i in range(highest_portion - 1):                      #for each likely particle, appends as many particles as there were originally in particle_cloud
@@ -217,17 +219,19 @@ class ParticleFilter:
 
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
-        d = msg.ranges    #gathers lidar readings
-        robotmin = 100           #initialize minimum distance to a large value
-        sigma = .03                   # standard deviation of laser measurements
+        self.data = msg.ranges    #gathers lidar readings
+        sigma = .1                   # standard deviation of laser measurements
         var = sigma**2                 # variance of laser measurements
-        for point in d:                     #sweeps through laser readings
-            if point > 0 and point < robotmin:   #picks out most recent smallest point that is nonzero
-                robotmin = point                 #updates minimum distance from objects to new reading
-        for particle in self.particle_cloud:         #sweeps through particle hypotheses
-            particlemin = self.occupancy_field.get_closest_obstacle_distance(particle.x,particle.y)     #determines minimum distance from particle hypotheses
-            diff = particlemin - robotmin       #computes difference between particle theory minimum and robot minimum
-            particle.w = math.exp(-diff**2/2*var)   #computes gaussian distribution to weight particles based on the difference
+        for direction in range(1):
+            angle = 90*direction                       #angle laser is reading
+            angle_rad = math.pi*angle/180   #converts angle to radians
+            d = self.read_angle(angle)      #reads distance from specific angle
+            for particle in self.particle_cloud:         #sweeps through particle hypotheses
+                obstaclex = d*math.sin(particle.theta + angle_rad) + particle.x     # where obstacle x value would be if robot were at particle
+                obstacley = d*math.cos(particle.theta + angle_rad) + particle.y     # where obstacle y value would be if robot were at particle
+                diff = self.occupancy_field.get_closest_obstacle_distance(obstaclex,obstacley)     #determines difference between where obstacle is and where we think it is
+                print diff
+                particle.w = particle.w*math.exp(-(diff**2/2*var))   #computes gaussian distribution to weight particles based on the difference
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -271,7 +275,7 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         # TODO create particles
-        for i in range(500):    #creates 200 points distributed with a gaussian distribution
+        for i in range(5):    #creates 200 points distributed with a gaussian distribution
             stdx = .5           #standard deviation scale of x direction
             stdy = .5           #standard deviation scale of y direction
             stdt = math.pi/10    #standard deviation scale of theta
@@ -372,6 +376,27 @@ class ParticleFilter:
                                           rospy.get_rostime(),
                                           self.odom_frame,
                                           self.map_frame)
+
+    def read_angle(self, angle):
+        '''
+        read the distance at an angle by averaging the readings
+            from the desired angle plus or minus 5 degrees disregarding
+            non-readins (avoids laser scanner glitches)
+        '''
+        pad = 5
+        readings = []
+        for i in range(2*pad):
+            index = (angle - pad + i)%360
+            dist = self.data[index]
+            if dist > 0:
+                readings.append(dist)
+        if readings != []:
+            #normally return the average reading
+            avg = sum(readings)/len(readings)
+            return avg
+        else:
+            #if there were no valid readings, return 100 (larger than any readings we saw)
+            return  10
 
 if __name__ == '__main__':
     n = ParticleFilter()
