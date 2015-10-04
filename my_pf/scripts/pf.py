@@ -141,19 +141,30 @@ class ParticleFilter:
             print "Service call failed: %s"%e
 
 
+    def avg_angles(self, Thetas, Weights):
+        """computes a weighted average of a list of angles"""
+        xval = [math.cos(theta) for theta in Thetas]    # loops through thetas and generates a list of all unit circle x values
+        yval = [math.sin(theta) for theta in Thetas]    #loops through thetas and generates a list of all unit circle y values
+        xavg = np.ma.average(xval,weights=[Weights])    # takes a weighted average of all X values
+        yavg = np.ma.average(yval,weights=[Weights])    # takes a weighted average of all Y values
+        tavg = math.atan(yavg/xavg)                     #computes arctangent of y averages and x averages
+        return tavg
+
+
+
     def update_robot_pose(self):
         """ Update the estimate of the robot's pose given the updated particles via a weighted average
 
         """
         # first make sure that the particle weights are normalized
         self.normalize_particles()                          #normalizes particle weights
-        X = [point.x for point in self.particle_cloud]      # loops through x values and generates a list of all x values
-        Y = [point.y for point in self.particle_cloud]      # loops through y values and generates a list of all y values
+        X = [point.x for point in self.particle_cloud]      # loops through points and generates a list of all x values
+        Y = [point.y for point in self.particle_cloud]      # loops through points and generates a list of all y values
         Theta = [point.theta for point in self.particle_cloud]  # loops through theta values and generates a list of all theta values
         Weight = [point.w for point in self.particle_cloud]     # loops through weights and generates a list of all weights
         robox = np.ma.average(X,weights=[Weight])                # takes a weighted average of all X values
         roboy = np.ma.average(Y,weights=[Weight])                # takes a weighted average of all Y values
-        robot = np.ma.average(Theta,weights=[Weight])            # takes a weighted average of all theta values
+        robot = self.avg_angles(Theta, Weight)           # takes a weighted average of all theta values
 
         self.robot_pose.position.x = robox     #updates robot pose with weighted X averages
         self.robot_pose.position.y = roboy     #updates robot pose with weighted Y averages
@@ -180,8 +191,8 @@ class ParticleFilter:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        xscale = .25             #randomness scaling for X
-        yscale = .25             #randomness scaling for Y
+        xscale = .1             #randomness scaling for X
+        yscale = .1             #randomness scaling for Y
         tscale =  math.pi/4    #randomness scaling for rotation
         for particle in self.particle_cloud:
             particle.x = particle.x + delta[0]*math.cos(particle.theta-self.current_odom_xy_theta[2]) - delta[1]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
@@ -200,15 +211,15 @@ class ParticleFilter:
             The weights stored with each particle should define the probability that a particular
             particle is selected in the resampling step. 
         """
-        highest_portion = 2     #fraction of weighted particle cloud we will take
+        highest_portion = 6     #fraction of weighted particle cloud we will take
         self.normalize_particles()  # make sure the distribution is normalized
         Weight = [point.w for point in self.particle_cloud]     # loops through weights and generates a list of all weights
         if len(self.particle_cloud) > 0:
             likely_particles = self.draw_random_sample(self.particle_cloud, Weight, len(self.particle_cloud)/highest_portion)    #takes a random weighted sample from previous hypotheses that is a fraction of the original number of particles
             self.particle_cloud = []                #clear particle cloud
-            stdx = .1           #standard deviation scale of x direction
-            stdy = .1           #standard deviation scale of y direction
-            stdt = math.pi/10    #standard deviation scale of theta
+            stdx = .05           #standard deviation scale of x direction
+            stdy = .05          #standard deviation scale of y direction
+            stdt = math.pi/15    #standard deviation scale of theta
             for particle in likely_particles:           #sweeps through the likely particles
                 self.particle_cloud.append(particle)    #appends original likely particles
                 for i in range(highest_portion - 1):                      #for each likely particle, appends as many particles as there were originally in particle_cloud
@@ -220,18 +231,22 @@ class ParticleFilter:
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
         self.data = msg.ranges    #gathers lidar readings
-        sigma = .1                   # standard deviation of laser measurements
+        sigma = .003                   # standard deviation of laser measurements
         var = sigma**2                 # variance of laser measurements
-        for direction in range(1):
-            angle = 90*direction                       #angle laser is reading
+        n = 8                           # number of directions the robot is reading in, rotationally symmetric
+        for direction in range(n):
+            angle = (360/n)*direction                       #angle laser is reading
             angle_rad = math.pi*angle/180   #converts angle to radians
             d = self.read_angle(angle)      #reads distance from specific angle
             for particle in self.particle_cloud:         #sweeps through particle hypotheses
-                obstaclex = d*math.sin(particle.theta + angle_rad) + particle.x     # where obstacle x value would be if robot were at particle
-                obstacley = d*math.cos(particle.theta + angle_rad) + particle.y     # where obstacle y value would be if robot were at particle
+                obstaclex = d*math.cos(particle.theta + angle_rad) + particle.x     # where obstacle x value would be if robot were at particle
+                obstacley = d*math.sin(particle.theta + angle_rad) + particle.y     # where obstacle y value would be if robot were at particle
                 diff = self.occupancy_field.get_closest_obstacle_distance(obstaclex,obstacley)     #determines difference between where obstacle is and where we think it is
-                print diff
-                particle.w = particle.w*math.exp(-(diff**2/2*var))   #computes gaussian distribution to weight particles based on the difference
+                if diff > 0:                                            #if diff is valid, then change particle weight
+                    particle.w = particle.w*math.exp(-(diff**2/2*var))   #computes gaussian distribution to weight particles based on the difference
+                else:
+                    print 'not updated'
+        print '\n\n\n updating \n\n\n'
 
     @staticmethod
     def weighted_values(values, probabilities, size):
@@ -275,7 +290,7 @@ class ParticleFilter:
             xy_theta = convert_pose_to_xy_and_theta(self.odom_pose.pose)
         self.particle_cloud = []
         # TODO create particles
-        for i in range(5):    #creates 200 points distributed with a gaussian distribution
+        for i in range(500):    #creates 200 points distributed with a gaussian distribution
             stdx = .5           #standard deviation scale of x direction
             stdy = .5           #standard deviation scale of y direction
             stdt = math.pi/10    #standard deviation scale of theta
