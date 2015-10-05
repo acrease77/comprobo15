@@ -4,16 +4,17 @@
 
 import rospy
 
-from std_msgs.msg import Header, String
+from std_msgs.msg import Header, String, ColorRGBA
 from sensor_msgs.msg import LaserScan
-from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, PoseArray, Pose, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, PoseWithCovarianceStamped, PoseArray, Pose, Point, Quaternion, Vector3
 from nav_msgs.srv import GetMap
 from copy import deepcopy
+from visualization_msgs.msg import Marker, MarkerArray
 
 import tf
 from tf import TransformListener
 from tf import TransformBroadcaster
-from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
+from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix, quaternion_from_euler
 from random import gauss
 
 import math
@@ -95,6 +96,8 @@ class ParticleFilter:
         self.laser_max_distance = 2.0   # maximum penalty to assess in the likelihood field model
         self.robot_pose = Pose()
 
+        self.obstacle = rospy.Publisher('/obstacle_array', MarkerArray, queue_size=10) #initializes publisher for obstacles in front of particles
+
         # TODO: define additional constants if needed
 
         # Setup pubs and subs
@@ -147,7 +150,7 @@ class ParticleFilter:
         yval = [math.sin(theta) for theta in Thetas]    #loops through thetas and generates a list of all unit circle y values
         xavg = np.ma.average(xval,weights=[Weights])    # takes a weighted average of all X values
         yavg = np.ma.average(yval,weights=[Weights])    # takes a weighted average of all Y values
-        tavg = math.atan(yavg/xavg)                     #computes arctangent of y averages and x averages
+        tavg = math.atan2(yavg,xavg)                     #computes arctangent of y averages and x averages
         return tavg
 
 
@@ -166,9 +169,8 @@ class ParticleFilter:
         roboy = np.ma.average(Y,weights=[Weight])                # takes a weighted average of all Y values
         robot = self.avg_angles(Theta, Weight)           # takes a weighted average of all theta values
 
-        self.robot_pose.position.x = robox     #updates robot pose with weighted X averages
-        self.robot_pose.position.y = roboy     #updates robot pose with weighted Y averages
-        self.robot_pose.orientation.z = robot     #updates robot pose with weighted theta averages
+        #angle_as_quaternion = quaternion_from_euler(0,0,robot)
+        self.robot_pose = Particle(x=robox,y=roboy,theta=robot).as_pose()   #updates robot pose with weighted averages
 
     def update_particles_with_odom(self, msg):
         """ Update the particles using the newly given odometry pose.
@@ -191,9 +193,9 @@ class ParticleFilter:
             self.current_odom_xy_theta = new_odom_xy_theta
             return
 
-        xscale = .1             #randomness scaling for X
-        yscale = .1             #randomness scaling for Y
-        tscale =  math.pi/4    #randomness scaling for rotation
+        xscale = .05             #randomness scaling for X
+        yscale = .05            #randomness scaling for Y
+        tscale =  math.pi/8    #randomness scaling for rotation
         for particle in self.particle_cloud:
             particle.x = particle.x + delta[0]*math.cos(particle.theta-self.current_odom_xy_theta[2]) - delta[1]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + xscale*randn()  #updates the X position based on the bot movement, and adds a random factor to the system
             particle.y = particle.y + delta[1]*math.cos(particle.theta-self.current_odom_xy_theta[2]) + delta[0]*math.sin(particle.theta-self.current_odom_xy_theta[2]) + yscale*randn()  #updates the Y position based on the bot movement, and adds a random factor to the system
@@ -217,9 +219,9 @@ class ParticleFilter:
         if len(self.particle_cloud) > 0:
             likely_particles = self.draw_random_sample(self.particle_cloud, Weight, len(self.particle_cloud)/highest_portion)    #takes a random weighted sample from previous hypotheses that is a fraction of the original number of particles
             self.particle_cloud = []                #clear particle cloud
-            stdx = .05           #standard deviation scale of x direction
-            stdy = .05          #standard deviation scale of y direction
-            stdt = math.pi/15    #standard deviation scale of theta
+            stdx = 0*.05           #standard deviation scale of x direction
+            stdy = 0*.05          #standard deviation scale of y direction
+            stdt = 0*math.pi/15    #standard deviation scale of theta
             for particle in likely_particles:           #sweeps through the likely particles
                 self.particle_cloud.append(particle)    #appends original likely particles
                 for i in range(highest_portion - 1):                      #for each likely particle, appends as many particles as there were originally in particle_cloud
@@ -231,14 +233,17 @@ class ParticleFilter:
     def update_particles_with_laser(self, msg):
         """ Updates the particle weights in response to the scan contained in the msg """
         self.data = msg.ranges    #gathers lidar readings
-        sigma = .003                   # standard deviation of laser measurements
+        sigma = .03                   # standard deviation of laser measurements
         var = sigma**2                 # variance of laser measurements
-        n = 8                           # number of directions the robot is reading in, rotationally symmetric
+        n = 6                          # number of directions the robot is reading in, rotationally symmetric
+        marker_array = MarkerArray()
+        id = 0
         for direction in range(n):
             angle = (360/n)*direction                       #angle laser is reading
             angle_rad = math.pi*angle/180   #converts angle to radians
             d = self.read_angle(angle)      #reads distance from specific angle
-            for particle in self.particle_cloud:         #sweeps through particle hypotheses
+            #d = 1.0
+            for marker_number, particle in enumerate(self.particle_cloud):         #sweeps through particle hypotheses
                 obstaclex = d*math.cos(particle.theta + angle_rad) + particle.x     # where obstacle x value would be if robot were at particle
                 obstacley = d*math.sin(particle.theta + angle_rad) + particle.y     # where obstacle y value would be if robot were at particle
                 diff = self.occupancy_field.get_closest_obstacle_distance(obstaclex,obstacley)     #determines difference between where obstacle is and where we think it is
@@ -246,6 +251,16 @@ class ParticleFilter:
                     particle.w = particle.w*math.exp(-(diff**2/2*var))   #computes gaussian distribution to weight particles based on the difference
                 else:
                     print 'not updated'
+                pose_msg = Particle(x=obstaclex,y=obstacley,theta=particle.theta).as_pose()
+                scale_msg = Vector3(x=0.1,y=0.1,z=0.1)
+                color_msg = ColorRGBA(r=1.0,g=0.0,b=0.0,a=1.0)
+                header_msg = Header(stamp=rospy.Time.now(),frame_id='/map')
+                msg = Marker(header=header_msg, pose=pose_msg, scale=scale_msg, color=color_msg)
+                msg.id = id
+                id += 1
+                marker_array.markers.append(msg)
+                msg.type=1
+        self.obstacle.publish(marker_array)
         print '\n\n\n updating \n\n\n'
 
     @staticmethod

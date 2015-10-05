@@ -13,7 +13,6 @@ import tf
 from tf import TransformListener
 from tf import TransformBroadcaster
 from tf.transformations import euler_from_quaternion, rotation_matrix, quaternion_from_matrix
-from random import gauss
 
 import math
 import time
